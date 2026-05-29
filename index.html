@@ -884,10 +884,29 @@ async function importCurrentMonthFromFile(event){
     const workbook = XLSX.read(fileBuffer, { type: "array" });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "", raw: false });
+    const matrixRows = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: "",
+      raw: false
+    });
 
     if(!ensureActiveWorkplace()){
       alert("Please create a workplace first.");
+      return;
+    }
+
+    const headerRowIndex = matrixRows.findIndex((row)=>{
+      const normalized = row.map((cell)=>String(cell).trim().toLowerCase());
+      return (
+        (normalized[0] === "datum" || normalized[0] === "date") &&
+        (normalized[1] === "ure" || normalized[1] === "hours") &&
+        (normalized[2] === "od" || normalized[2] === "from") &&
+        (normalized[3] === "do" || normalized[3] === "to")
+      );
+    });
+
+    if(headerRowIndex === -1){
+      alert("Import failed: could not find table headers.");
       return;
     }
 
@@ -896,17 +915,17 @@ async function importCurrentMonthFromFile(event){
     let firstImportedMonth = null;
     let firstImportedYear = null;
 
-    rows.forEach((row)=>{
-      const dateValue = row.Datum || row.Date || "";
+    matrixRows.slice(headerRowIndex + 1).forEach((row)=>{
+      const dateValue = row[0] || "";
       const parsedDate = parseImportedDate(dateValue);
 
       if(!parsedDate){
         return;
       }
 
-      const fromValue = String(row.Od || row.From || "").trim();
-      const toValue = String(row.Do || row.To || "").trim();
-      let hoursValue = parseHoursValue(row.Ure || row.Hours || 0);
+      const fromValue = String(row[2] || "").trim();
+      const toValue = String(row[3] || "").trim();
+      let hoursValue = parseHoursValue(row[1] || 0);
 
       const hasRange =
         fromValue && toValue && fromValue !== "-" && toValue !== "-";
@@ -1082,24 +1101,24 @@ function exportCurrentMonth(){
     Do: ""
   });
 
-  worksheetRows.push({
-    Datum: "made with Kairo tool",
-    Ure: "",
-    Od: "",
-    Do: ""
-  });
-
   const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(worksheetRows, {
-    header: ["Datum","Ure","Od","Do"]
-  });
+  const worksheetData = [
+    ["Kairo", "", "", ""],
+    ["Datum","Ure","Od","Do"],
+    ...worksheetRows.map((row)=>[row.Datum, row.Ure, row.Od, row.Do])
+  ];
+  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
-  const madeWithRow = worksheetRows.length + 1;
-  const madeWithCell = `A${madeWithRow}`;
-  if(worksheet[madeWithCell]){
-    worksheet[madeWithCell].l = {
-      Target: "https://kalaqic.github.io/kairo/",
-      Tooltip: "Open Kairo"
+  worksheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }
+  ];
+
+  if(worksheet.A1){
+    worksheet.A1.s = {
+      alignment: {
+        horizontal: "center",
+        vertical: "center"
+      }
     };
   }
 
@@ -1111,7 +1130,7 @@ function exportCurrentMonth(){
   ];
 
   XLSX.utils.book_append_sheet(workbook, worksheet, "Evidenca dela");
-  XLSX.writeFile(workbook, fileName);
+  XLSX.writeFile(workbook, fileName, { cellStyles: true });
 }
 
 function renderCalendar(){
