@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kairo</title>
+
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family:Inter,sans-serif;
+    }
+
+    body{
+      background:#0f0f0f;
+      color:white;
+      min-height:100vh;
+      padding:30px;
+    }
+
+    .container{
+      max-width:1100px;
+      margin:auto;
+    }
+
+    h1{
+      font-size:40px;
+      margin-bottom:25px;
+      margin-top: 70px;
+    }
+
+    .app-tagline{
+      margin-top:-18px;
+      margin-bottom:10px;
+      opacity:.72;
+      font-size:15px;
+      letter-spacing:.2px;
+    }
+
+    .today-date{
+      margin-top:0;
+      margin-bottom:70px;
+      opacity:.65;
+      font-size:15px;
+      letter-spacing:.2px;
+    }
+
+    .top-bar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:30px;
+    }
+
+    .bubble{
+      padding:12px 18px;
+      border-radius:999px;
+      background:#1e1e1e;
+      border:2px solid transparent;
+      cursor:pointer;
+      transition:.2s;
+      user-select:none;
+    }
+
+    .bubble.active{
+      border-color:#fff;
+      background:#2a2a2a;
+    }
+
+    .add-bubble{
+      background:#fff;
+      color:#000;
+      font-weight:bold;
+    }
+
+    .calendar-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:20px;
+    }
+
+    .month-nav{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+
+    .export-btn{
+      font-weight:600;
+      background:#232323;
+    }
+
+    button{
+      border:none;
+      background:#1f1f1f;
+      color:white;
+      padding:10px 16px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:16px;
+    }
+
+    button:hover{
+      background:#2d2d2d;
+    }
+
+    .calendar{
+      display:grid;
+      grid-template-columns:repeat(7,1fr);
+      gap:10px;
+    }
+
+    .day-name{
+      opacity:.6;
+      text-align:center;
+      margin-bottom:5px;
+    }
+
+    .day{
+      background:#1b1b1b;
+      border-radius:18px;
+      min-height:110px;
+      padding:10px;
+      cursor:pointer;
+      transition:.2s;
+      position:relative;
+    }
+
+    .day:hover{
+      background:#252525;
+    }
+
+    .day.today{
+      background:#232323;
+      border:1px solid #ffffff;
+      box-shadow:0 0 0 1px rgba(255,255,255,.12) inset, 0 0 18px rgba(255,255,255,.08);
+    }
+
+    .day.today .day-number{
+      opacity:1;
+      font-weight:700;
+    }
+
+    .day-number{
+      font-size:14px;
+      opacity:.7;
+      margin-bottom:8px;
+    }
+
+    .hours{
+      font-size:24px;
+      font-weight:bold;
+    }
+
+    .shift-range{
+      font-size:13px;
+      opacity:.75;
+      margin-bottom:4px;
+      letter-spacing:.2px;
+    }
+
+    .summary{
+      margin-top:35px;
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+      gap:15px;
+    }
+
+    .card{
+      background:#1b1b1b;
+      border-radius:20px;
+      padding:20px;
+    }
+
+    .card h2{
+      font-size:14px;
+      opacity:.6;
+      margin-bottom:10px;
+      font-weight:500;
+    }
+
+    .card p{
+      font-size:32px;
+      font-weight:bold;
+    }
+
+    .empty{
+      opacity:.25;
+    }
+
+    input{
+      width:100%;
+      margin-top:10px;
+      padding:12px;
+      border:none;
+      border-radius:12px;
+      background:#2b2b2b;
+      color:white;
+      font-size:16px;
+    }
+
+    .modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.7);
+      display:none;
+      justify-content:center;
+      align-items:center;
+      z-index:1000;
+    }
+
+    .modal-content{
+      width:350px;
+      background:#171717;
+      padding:25px;
+      border-radius:24px;
+    }
+
+    .modal-content h3{
+      margin-bottom:20px;
+    }
+
+    .mode-switch{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-bottom:12px;
+    }
+
+    .mode-btn{
+      background:#222;
+      color:white;
+      border:1px solid #313131;
+      padding:10px 12px;
+      border-radius:12px;
+      font-size:14px;
+      font-weight:600;
+      width:auto;
+      margin-top:0;
+    }
+
+    .mode-btn.active{
+      background:white;
+      color:black;
+      border-color:white;
+    }
+
+    .mode-btn:hover{
+      background:#2a2a2a;
+    }
+
+    .mode-btn.active:hover{
+      background:white;
+    }
+
+    .time-range{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .hidden{
+      display:none;
+    }
+
+    .modal-content .primary-btn{
+      width:100%;
+      margin-top:15px;
+      background:white;
+      color:black;
+      font-weight:bold;
+    }
+
+    .modal-content .secondary-btn{
+      width:100%;
+      margin-top:10px;
+      background:#222;
+      color:#ffb3b3;
+      border:1px solid #3a3a3a;
+      font-weight:600;
+    }
+
+    .modal-content .secondary-btn:hover{
+      background:#2a2a2a;
+    }
+
+    .legend{
+      margin-top:15px;
+      opacity:.5;
+      font-size:14px;
+    }
+
+    .credit{
+      margin-top:40px;
+      text-align:center;
+      opacity:.7;
+      font-size:14px;
+    }
+
+    .credit a{
+      color:white;
+      font-weight:700;
+      text-decoration:none;
+    }
+
+    .credit a:hover{
+      opacity:.9;
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <h1>Kairo</h1>
+  <div class="app-tagline">your favorite shift tracker and pay calculator.</div>
+  <div class="today-date" id="todayDate"></div>
+
+  <div class="top-bar" id="workplaceTabs"></div>
+
+  <div class="calendar-header">
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">←</button>
+      <h2 id="monthTitle"></h2>
+      <button onclick="changeMonth(1)">→</button>
+    </div>
+    <button class="export-btn" onclick="exportCurrentMonth()">Export month</button>
+  </div>
+
+  <div class="calendar" id="calendar"></div>
+
+  <div class="summary">
+    <div class="card">
+      <h2>Total earnings</h2>
+      <p id="earnings">0€</p>
+    </div>
+
+    <div class="card">
+      <h2>Total hours</h2>
+      <p id="hoursWorked">0h</p>
+    </div>
+
+    <div class="card">
+      <h2>Shifts</h2>
+      <p id="shifts">0</p>
+    </div>
+  </div>
+
+  <div class="legend">
+    Click on any day to enter shift by time range or total hours.
+  </div>
+
+  <div class="credit">
+    tool made by
+    <a href="https://www.linkedin.com/in/kalabic-david/" target="_blank" rel="noopener noreferrer">david kalabić</a>
+  </div>
+
+</div>
+
+<div class="modal" id="hoursModal">
+  <div class="modal-content">
+    <h3 id="modalDate"></h3>
+
+    <div class="mode-switch">
+      <button class="mode-btn active" id="rangeModeBtn" onclick="setEntryMode('range')">From - To</button>
+      <button class="mode-btn" id="totalModeBtn" onclick="setEntryMode('total')">Total hours</button>
+    </div>
+
+    <div id="timeRangeGroup">
+      <label>Work time</label>
+      <div class="time-range">
+        <input type="time" id="startTimeInput">
+        <input type="time" id="endTimeInput">
+      </div>
+    </div>
+
+    <div id="totalHoursGroup" class="hidden">
+      <label>Hours worked</label>
+      <input type="number" step="0.1" id="hoursInput" placeholder="e.g. 8">
+    </div>
+
+    <button class="primary-btn" onclick="saveHours()">Save</button>
+    <button class="secondary-btn" id="clearDayBtn" onclick="clearDay()">Clear day</button>
+  </div>
+</div>
+
+<div class="modal" id="workplaceModal">
+  <div class="modal-content">
+    <h3>Add workplace</h3>
+
+    <label>Workplace name</label>
+    <input type="text" id="placeName" placeholder="e.g. Phoenix Radio">
+
+    <label>Hourly wage (€)</label>
+    <input type="number" step="0.01" id="hourlyRate" placeholder="e.g. 7.73">
+
+    <button class="primary-btn" onclick="createWorkplace()">Create</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+
+let workplaces = JSON.parse(localStorage.getItem("workplaces")) || [];
+let activeWorkplace = 0;
+
+const today = new Date();
+let currentMonth = today.getMonth();
+let currentYear = today.getFullYear();
+
+let selectedDateKey = "";
+let selectedEntryMode = "range";
+
+function renderTodayDate(){
+  const now = new Date();
+
+  const formatted = now.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
+
+  document.getElementById("todayDate").innerText = `Today: ${formatted}`;
+}
+
+function parseEntry(entry){
+  if(typeof entry === "number"){
+    return {
+      hours: entry,
+      mode: "total",
+      startTime: "",
+      endTime: ""
+    };
+  }
+
+  if(entry && typeof entry === "object"){
+    return {
+      hours: parseFloat(entry.hours) || 0,
+      mode: entry.mode === "range" ? "range" : "total",
+      startTime: entry.startTime || "",
+      endTime: entry.endTime || ""
+    };
+  }
+
+  return {
+    hours: 0,
+    mode: "range",
+    startTime: "",
+    endTime: ""
+  };
+}
+
+function formatHours(hours){
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+}
+
+function calculateHoursFromRange(start, end){
+  const [startHour, startMinute] = start.split(":").map(Number);
+  const [endHour, endMinute] = end.split(":").map(Number);
+
+  let startTotal = startHour * 60 + startMinute;
+  let endTotal = endHour * 60 + endMinute;
+
+  if(endTotal < startTotal){
+    endTotal += 24 * 60;
+  }
+
+  const diffHours = (endTotal - startTotal) / 60;
+  return Math.round(diffHours * 10) / 10;
+}
+
+function setEntryMode(mode){
+  selectedEntryMode = mode;
+
+  document.getElementById("rangeModeBtn").classList.toggle("active", mode === "range");
+  document.getElementById("totalModeBtn").classList.toggle("active", mode === "total");
+
+  document.getElementById("timeRangeGroup").classList.toggle("hidden", mode !== "range");
+  document.getElementById("totalHoursGroup").classList.toggle("hidden", mode !== "total");
+}
+
+function saveData(){
+  localStorage.setItem("workplaces", JSON.stringify(workplaces));
+}
+
+function openWorkplaceModal(){
+  document.getElementById("workplaceModal").style.display = "flex";
+}
+
+function createWorkplace(){
+
+  const name = document.getElementById("placeName").value.trim();
+  const rate = parseFloat(document.getElementById("hourlyRate").value);
+
+  if(!name || !rate) return;
+
+  workplaces.push({
+    name,
+    rate,
+    entries:{}
+  });
+
+  activeWorkplace = workplaces.length - 1;
+
+  saveData();
+
+  document.getElementById("placeName").value = "";
+  document.getElementById("hourlyRate").value = "";
+
+  document.getElementById("workplaceModal").style.display = "none";
+
+  renderTabs();
+  renderCalendar();
+}
+
+function renderTabs(){
+
+  const container = document.getElementById("workplaceTabs");
+  container.innerHTML = "";
+
+  workplaces.forEach((place,index)=>{
+
+    const div = document.createElement("div");
+    div.className = "bubble " + (index === activeWorkplace ? "active" : "");
+
+    div.innerText = place.name;
+
+    div.onclick = ()=>{
+      activeWorkplace = index;
+      renderTabs();
+      renderCalendar();
+    };
+
+    container.appendChild(div);
+  });
+
+  const add = document.createElement("div");
+  add.className = "bubble add-bubble";
+  add.innerText = "+";
+
+  add.onclick = openWorkplaceModal;
+
+  container.appendChild(add);
+}
+
+function changeMonth(direction){
+
+  currentMonth += direction;
+
+  if(currentMonth > 11){
+    currentMonth = 0;
+    currentYear++;
+  }
+
+  if(currentMonth < 0){
+    currentMonth = 11;
+    currentYear--;
+  }
+
+  renderCalendar();
+}
+
+function exportCurrentMonth(){
+  if(workplaces.length === 0){
+    return;
+  }
+
+  if(typeof XLSX === "undefined"){
+    alert("SheetJS failed to load. Check your internet connection and try again.");
+    return;
+  }
+
+  const workplace = workplaces[activeWorkplace];
+  const monthNames = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  const daysInMonth = new Date(currentYear,currentMonth+1,0).getDate();
+  const rows = [];
+  let totalHours = 0;
+
+  for(let day=1; day<=daysInMonth; day++){
+    const key = `${currentYear}-${currentMonth+1}-${day}`;
+    const entryData = parseEntry(workplace.entries[key]);
+
+    if(entryData.hours <= 0){
+      continue;
+    }
+
+    totalHours += entryData.hours;
+
+    const dayLabel = String(day).padStart(2,"0");
+    const monthLabel = String(currentMonth + 1).padStart(2,"0");
+    const dateLabel = `${dayLabel}/${monthLabel}/${currentYear}`;
+    const fromTime = entryData.startTime || "-";
+    const toTime = entryData.endTime || "-";
+
+    rows.push({
+      date: dateLabel,
+      hours: formatHours(entryData.hours),
+      from: fromTime,
+      to: toTime
+    });
+  }
+
+  if(rows.length === 0){
+    alert("No worked hours in this month to export.");
+    return;
+  }
+
+  const monthName = monthNames[currentMonth];
+  const fileName = `${workplace.name}-${monthName}-${currentYear}.xlsx`.replace(/\s+/g,"-");
+
+  const worksheetRows = rows.map((row)=>({
+    Datum: row.date,
+    Ure: row.hours,
+    Od: row.from,
+    Do: row.to
+  }));
+
+  worksheetRows.push({
+    Datum: "Skupaj ur v mesecu",
+    Ure: formatHours(totalHours),
+    Od: "",
+    Do: ""
+  });
+
+  worksheetRows.push({
+    Datum: "made with Kairo tool",
+    Ure: "",
+    Od: "",
+    Do: ""
+  });
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(worksheetRows, {
+    header: ["Datum","Ure","Od","Do"]
+  });
+
+  worksheet["!cols"] = [
+    { wch: 16 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 }
+  ];
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Evidenca dela");
+  XLSX.writeFile(workbook, fileName);
+}
+
+function renderCalendar(){
+
+  if(workplaces.length === 0){
+    openWorkplaceModal();
+    return;
+  }
+
+  const calendar = document.getElementById("calendar");
+  calendar.innerHTML = "";
+  const now = new Date();
+  const isCurrentMonth =
+    now.getFullYear() === currentYear && now.getMonth() === currentMonth;
+
+  const monthNames = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  document.getElementById("monthTitle").innerText =
+    `${monthNames[currentMonth]} ${currentYear}`;
+
+  const dayNames = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+  dayNames.forEach(day=>{
+    const el = document.createElement("div");
+    el.className = "day-name";
+    el.innerText = day;
+    calendar.appendChild(el);
+  });
+
+  const firstDay = new Date(currentYear,currentMonth,1);
+  let startDay = firstDay.getDay() - 1;
+
+  if(startDay < 0) startDay = 6;
+
+  const daysInMonth = new Date(currentYear,currentMonth+1,0).getDate();
+
+  for(let i=0;i<startDay;i++){
+    const empty = document.createElement("div");
+    empty.className = "day empty";
+    calendar.appendChild(empty);
+  }
+
+  const workplace = workplaces[activeWorkplace];
+
+  let totalHours = 0;
+  let shifts = 0;
+
+  for(let day=1; day<=daysInMonth; day++){
+
+    const key = `${currentYear}-${currentMonth+1}-${day}`;
+    const entryData = parseEntry(workplace.entries[key]);
+    const workedHours = entryData.hours;
+    const hasRangeInfo =
+      entryData.mode === "range" && entryData.startTime && entryData.endTime;
+
+    if(workedHours > 0){
+      totalHours += workedHours;
+      shifts++;
+    }
+
+    const div = document.createElement("div");
+    div.className = "day";
+
+    if(isCurrentMonth && day === now.getDate()){
+      div.classList.add("today");
+    }
+
+    div.innerHTML = `
+      <div class="day-number">${day}</div>
+      ${hasRangeInfo ? `<div class="shift-range">${entryData.startTime} - ${entryData.endTime}</div>` : ""}
+      <div class="hours">${workedHours ? formatHours(workedHours) + "h" : ""}</div>
+    `;
+
+    div.onclick = ()=>{
+      selectedDateKey = key;
+
+      document.getElementById("modalDate").innerText =
+        `${day}. ${monthNames[currentMonth]}`;
+
+      const selectedEntry = parseEntry(workplace.entries[key]);
+
+      document.getElementById("hoursInput").value =
+        selectedEntry.hours || "";
+
+      document.getElementById("startTimeInput").value =
+        selectedEntry.startTime || "";
+
+      document.getElementById("endTimeInput").value =
+        selectedEntry.endTime || "";
+
+      setEntryMode(selectedEntry.mode);
+      const hasExistingEntry = Object.prototype.hasOwnProperty.call(workplace.entries, key);
+      document.getElementById("clearDayBtn").style.display = hasExistingEntry ? "block" : "none";
+
+      document.getElementById("hoursModal").style.display = "flex";
+    };
+
+    calendar.appendChild(div);
+  }
+
+  const earnings = totalHours * workplace.rate;
+
+  document.getElementById("earnings").innerText =
+    earnings.toFixed(2) + "€";
+
+  document.getElementById("hoursWorked").innerText =
+    totalHours + "h";
+
+  document.getElementById("shifts").innerText =
+    shifts;
+}
+
+function saveHours(){
+  const workplace = workplaces[activeWorkplace];
+  let entry = null;
+
+  if(selectedEntryMode === "total"){
+    const value = parseFloat(document.getElementById("hoursInput").value) || 0;
+
+    entry = {
+      mode: "total",
+      hours: value,
+      startTime: "",
+      endTime: ""
+    };
+  }else{
+    const startTime = document.getElementById("startTimeInput").value;
+    const endTime = document.getElementById("endTimeInput").value;
+
+    if(!startTime || !endTime){
+      alert("Please enter both start and end time.");
+      return;
+    }
+
+    const calculatedHours = calculateHoursFromRange(startTime, endTime);
+
+    entry = {
+      mode: "range",
+      hours: calculatedHours,
+      startTime,
+      endTime
+    };
+  }
+
+  workplace.entries[selectedDateKey] = entry;
+
+  saveData();
+
+  document.getElementById("hoursModal").style.display = "none";
+
+  renderCalendar();
+}
+
+function clearDay(){
+  const workplace = workplaces[activeWorkplace];
+  delete workplace.entries[selectedDateKey];
+
+  saveData();
+
+  document.getElementById("hoursModal").style.display = "none";
+
+  renderCalendar();
+}
+
+window.onclick = (e)=>{
+
+  if(e.target.id === "hoursModal"){
+    document.getElementById("hoursModal").style.display = "none";
+  }
+
+  if(e.target.id === "workplaceModal"){
+    document.getElementById("workplaceModal").style.display = "none";
+  }
+};
+
+renderTabs();
+renderCalendar();
+renderTodayDate();
+
+</script>
+
+</body>
+</html>
