@@ -139,6 +139,13 @@
       display:grid;
       grid-template-columns:repeat(7,1fr);
       gap:10px;
+      min-width:760px;
+    }
+
+    .calendar-scroll{
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      padding-bottom:4px;
     }
 
     .day-name{
@@ -343,6 +350,107 @@
       opacity:.9;
     }
 
+    @media (max-width:900px){
+      body{
+        padding:18px;
+      }
+
+      h1{
+        margin-top:24px;
+        margin-bottom:14px;
+      }
+
+      .app-tagline{
+        margin-top:0;
+      }
+
+      .today-date{
+        margin-bottom:28px;
+      }
+
+      .calendar-header{
+        flex-direction:column;
+        align-items:stretch;
+        gap:8px;
+      }
+
+      .month-nav{
+        justify-content:space-between;
+        width:100%;
+        order:2;
+      }
+
+      .month-nav button{
+        padding:8px 12px;
+        font-size:14px;
+      }
+
+      .month-nav h2{
+        font-size:20px;
+        text-align:center;
+      }
+
+      .header-actions{
+        width:100%;
+        display:flex;
+        flex-wrap:wrap;
+        justify-content:center;
+        gap:8px;
+        order:1;
+        padding-bottom:10px;
+      }
+
+      .header-actions button{
+        width:auto;
+        flex:0 0 auto;
+        font-size:12px;
+        padding:8px 10px;
+        border-radius:9px;
+      }
+
+      .summary{
+        grid-template-columns:1fr;
+      }
+
+      .modal-content{
+        width:min(92vw,350px);
+      }
+    }
+
+    @media (max-width:640px){
+      .header-actions{
+        justify-content:center;
+        padding-bottom:12px;
+      }
+
+      .month-nav h2{
+        font-size:18px;
+      }
+
+      .calendar{
+        min-width:640px;
+        gap:8px;
+      }
+
+      .day{
+        min-height:88px;
+        border-radius:14px;
+        padding:8px;
+      }
+
+      .day-name{
+        font-size:12px;
+      }
+
+      .shift-range{
+        font-size:11px;
+      }
+
+      .hours{
+        font-size:18px;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -370,7 +478,9 @@
   </div>
   <input type="file" id="importFileInput" accept=".xlsx,.xls" class="hidden">
 
-  <div class="calendar" id="calendar"></div>
+  <div class="calendar-scroll">
+    <div class="calendar" id="calendar"></div>
+  </div>
 
   <div class="summary">
     <div class="card">
