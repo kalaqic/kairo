@@ -202,6 +202,11 @@
       font-size:16px;
     }
 
+    .workplace-rate-label{
+      display:block;
+      margin-top:14px;
+    }
+
     .modal{
       position:fixed;
       inset:0;
@@ -395,7 +400,7 @@
     <label>Workplace name</label>
     <input type="text" id="placeName" placeholder="e.g. Phoenix Radio">
 
-    <label>Hourly wage (€)</label>
+    <label class="workplace-rate-label">Hourly wage (€)</label>
     <input type="number" step="0.01" id="hourlyRate" placeholder="e.g. 7.73">
 
     <button class="primary-btn" onclick="createWorkplace()">Create</button>
