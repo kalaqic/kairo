@@ -93,6 +93,23 @@
       background:#232323;
     }
 
+    .header-actions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+
+    .danger-btn{
+      background:#2a1f1f;
+      color:#ffb3b3;
+      border:1px solid #4a2e2e;
+      font-weight:600;
+    }
+
+    .danger-btn:hover{
+      background:#332525;
+    }
+
     button{
       border:none;
       background:#1f1f1f;
@@ -333,8 +350,14 @@
       <h2 id="monthTitle"></h2>
       <button onclick="changeMonth(1)">→</button>
     </div>
-    <button class="export-btn" onclick="exportCurrentMonth()">Export month</button>
+    <div class="header-actions">
+      <button class="export-btn" onclick="triggerImportMonth()">Import month</button>
+      <button class="export-btn" onclick="exportCurrentMonth()">Export month</button>
+      <button class="export-btn" onclick="clearCurrentMonth()">Clear month</button>
+      <button class="danger-btn" onclick="deleteActiveWorkplace()">Delete workplace</button>
+    </div>
   </div>
+  <input type="file" id="importFileInput" accept=".xlsx,.xls" class="hidden">
 
   <div class="calendar" id="calendar"></div>
 
@@ -493,6 +516,23 @@ function saveData(){
   localStorage.setItem("workplaces", JSON.stringify(workplaces));
 }
 
+function ensureActiveWorkplace(){
+  if(workplaces.length === 0){
+    activeWorkplace = 0;
+    return false;
+  }
+
+  if(activeWorkplace >= workplaces.length){
+    activeWorkplace = workplaces.length - 1;
+  }
+
+  if(activeWorkplace < 0){
+    activeWorkplace = 0;
+  }
+
+  return true;
+}
+
 function openWorkplaceModal(){
   document.getElementById("workplaceModal").style.display = "flex";
 }
@@ -527,6 +567,8 @@ function renderTabs(){
 
   const container = document.getElementById("workplaceTabs");
   container.innerHTML = "";
+
+  ensureActiveWorkplace();
 
   workplaces.forEach((place,index)=>{
 
@@ -570,8 +612,193 @@ function changeMonth(direction){
   renderCalendar();
 }
 
+function parseImportedDate(value){
+  const dateString = String(value).trim();
+  const match = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  if(!match){
+    return null;
+  }
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  if(day < 1 || day > 31 || month < 1 || month > 12){
+    return null;
+  }
+
+  return { day, month, year };
+}
+
+function parseHoursValue(value){
+  const normalized = String(value).replace(",", ".").trim();
+  const parsed = parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function triggerImportMonth(){
+  if(!ensureActiveWorkplace()){
+    alert("Please create a workplace first.");
+    return;
+  }
+
+  if(typeof XLSX === "undefined"){
+    alert("SheetJS failed to load. Check your internet connection and try again.");
+    return;
+  }
+
+  const input = document.getElementById("importFileInput");
+  input.value = "";
+  input.click();
+}
+
+async function importCurrentMonthFromFile(event){
+  const file = event.target.files[0];
+
+  if(!file){
+    return;
+  }
+
+  try{
+    const fileBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(fileBuffer, { type: "array" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "", raw: false });
+
+    if(!ensureActiveWorkplace()){
+      alert("Please create a workplace first.");
+      return;
+    }
+
+    const workplace = workplaces[activeWorkplace];
+    let importedCount = 0;
+    let firstImportedMonth = null;
+    let firstImportedYear = null;
+
+    rows.forEach((row)=>{
+      const dateValue = row.Datum || row.Date || "";
+      const parsedDate = parseImportedDate(dateValue);
+
+      if(!parsedDate){
+        return;
+      }
+
+      const fromValue = String(row.Od || row.From || "").trim();
+      const toValue = String(row.Do || row.To || "").trim();
+      let hoursValue = parseHoursValue(row.Ure || row.Hours || 0);
+
+      const hasRange =
+        fromValue && toValue && fromValue !== "-" && toValue !== "-";
+
+      if(hoursValue <= 0 && hasRange){
+        hoursValue = calculateHoursFromRange(fromValue, toValue);
+      }
+
+      if(hoursValue <= 0){
+        return;
+      }
+
+      const key = `${parsedDate.year}-${parsedDate.month}-${parsedDate.day}`;
+
+      if(hasRange){
+        workplace.entries[key] = {
+          mode: "range",
+          hours: hoursValue,
+          startTime: fromValue,
+          endTime: toValue
+        };
+      }else{
+        workplace.entries[key] = {
+          mode: "total",
+          hours: hoursValue,
+          startTime: "",
+          endTime: ""
+        };
+      }
+
+      if(firstImportedMonth === null){
+        firstImportedMonth = parsedDate.month - 1;
+        firstImportedYear = parsedDate.year;
+      }
+
+      importedCount++;
+    });
+
+    if(importedCount === 0){
+      alert("No valid shift rows found in this file.");
+      return;
+    }
+
+    if(firstImportedMonth !== null && firstImportedYear !== null){
+      currentMonth = firstImportedMonth;
+      currentYear = firstImportedYear;
+    }
+
+    saveData();
+    renderCalendar();
+    alert(`Imported ${importedCount} day(s) successfully.`);
+  }catch(error){
+    console.error(error);
+    alert("Import failed. Please use an exported Kairo .xlsx file.");
+  }
+}
+
+function clearCurrentMonth(){
+  if(!ensureActiveWorkplace()){
+    alert("Please create a workplace first.");
+    return;
+  }
+
+  const workplace = workplaces[activeWorkplace];
+  const monthPrefix = `${currentYear}-${currentMonth+1}-`;
+  const keysToDelete = Object.keys(workplace.entries).filter((key)=>key.startsWith(monthPrefix));
+
+  if(keysToDelete.length === 0){
+    alert("No entries found in this month.");
+    return;
+  }
+
+  const confirmed = confirm(`Clear ${keysToDelete.length} entr${keysToDelete.length === 1 ? "y" : "ies"} for this month?`);
+  if(!confirmed){
+    return;
+  }
+
+  keysToDelete.forEach((key)=>{
+    delete workplace.entries[key];
+  });
+
+  saveData();
+  renderCalendar();
+}
+
+function deleteActiveWorkplace(){
+  if(!ensureActiveWorkplace()){
+    alert("No workplace to delete.");
+    return;
+  }
+
+  const currentName = workplaces[activeWorkplace].name;
+  const confirmed = confirm(`Delete workplace "${currentName}" and all its entries?`);
+
+  if(!confirmed){
+    return;
+  }
+
+  workplaces.splice(activeWorkplace, 1);
+
+  if(activeWorkplace >= workplaces.length){
+    activeWorkplace = workplaces.length - 1;
+  }
+
+  saveData();
+  renderTabs();
+  renderCalendar();
+}
+
 function exportCurrentMonth(){
-  if(workplaces.length === 0){
+  if(!ensureActiveWorkplace()){
     return;
   }
 
@@ -648,6 +875,15 @@ function exportCurrentMonth(){
     header: ["Datum","Ure","Od","Do"]
   });
 
+  const madeWithRow = worksheetRows.length + 1;
+  const madeWithCell = `A${madeWithRow}`;
+  if(worksheet[madeWithCell]){
+    worksheet[madeWithCell].l = {
+      Target: "https://kalaqic.github.io/kairo/",
+      Tooltip: "Open Kairo"
+    };
+  }
+
   worksheet["!cols"] = [
     { wch: 16 },
     { wch: 10 },
@@ -661,7 +897,7 @@ function exportCurrentMonth(){
 
 function renderCalendar(){
 
-  if(workplaces.length === 0){
+  if(!ensureActiveWorkplace()){
     openWorkplaceModal();
     return;
   }
@@ -834,6 +1070,8 @@ window.onclick = (e)=>{
     document.getElementById("workplaceModal").style.display = "none";
   }
 };
+
+document.getElementById("importFileInput").addEventListener("change", importCurrentMonthFromFile);
 
 renderTabs();
 renderCalendar();
