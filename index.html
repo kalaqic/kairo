@@ -358,6 +358,44 @@
       gap:10px;
     }
 
+    .time-ranges-list{
+      display:grid;
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .time-range-row{
+      display:grid;
+      grid-template-columns:1fr 1fr auto;
+      gap:8px;
+      align-items:center;
+    }
+
+    .time-range-row input{
+      margin-top:0;
+    }
+
+    .remove-range-btn{
+      width:auto;
+      margin-top:0;
+      padding:9px 10px;
+      border-radius:10px;
+      background:#2a1f1f;
+      color:#ffb3b3;
+      border:1px solid #4a2e2e;
+      font-weight:600;
+      font-size:13px;
+    }
+
+    .add-range-btn{
+      width:100%;
+      margin-top:10px;
+      background:#242424;
+      border:1px solid #343434;
+      font-weight:600;
+      font-size:14px;
+    }
+
     .hidden{
       display:none;
     }
@@ -488,6 +526,14 @@
       .modal-content{
         width:min(92vw,350px);
       }
+
+      .time-range-row{
+        grid-template-columns:1fr;
+      }
+
+      .remove-range-btn{
+        width:100%;
+      }
     }
 
     @media (max-width:640px){
@@ -551,6 +597,7 @@
       <button onclick="changeMonth(1)">→</button>
     </div>
     <div class="header-actions">
+      <button class="export-btn" onclick="openWorkplaceModal('edit')">Edit workplace</button>
       <button class="export-btn" onclick="triggerImportMonth()">Import month</button>
       <button class="export-btn" onclick="exportCurrentMonth()">Export month</button>
       <button class="export-btn" onclick="clearCurrentMonth()">Clear month</button>
@@ -603,10 +650,8 @@
 
     <div id="timeRangeGroup">
       <label>Work time</label>
-      <div class="time-range">
-        <input type="time" id="startTimeInput">
-        <input type="time" id="endTimeInput">
-      </div>
+      <div class="time-ranges-list" id="timeRangesList"></div>
+      <button class="add-range-btn" type="button" onclick="addTimeRangeRow()">+ Add work time</button>
     </div>
 
     <div id="totalHoursGroup" class="hidden">
@@ -621,7 +666,7 @@
 
 <div class="modal" id="workplaceModal">
   <div class="modal-content">
-    <h3>Add workplace</h3>
+    <h3 id="workplaceModalTitle">Add workplace</h3>
 
     <label>Workplace name</label>
     <input type="text" id="placeName" placeholder="e.g. Phoenix Radio">
@@ -629,7 +674,7 @@
     <label class="workplace-rate-label">Hourly wage (€)</label>
     <input type="number" step="0.01" id="hourlyRate" placeholder="e.g. 7.73">
 
-    <button class="primary-btn" onclick="createWorkplace()">Create</button>
+    <button class="primary-btn" id="workplaceSaveBtn" onclick="saveWorkplace()">Create</button>
   </div>
 </div>
 
@@ -645,6 +690,7 @@ let currentYear = today.getFullYear();
 
 let selectedDateKey = "";
 let selectedEntryMode = "range";
+let workplaceModalMode = "create";
 
 function renderTodayDate(){
   const now = new Date();
@@ -681,16 +727,36 @@ function parseEntry(entry){
       hours: entry,
       mode: "total",
       startTime: "",
-      endTime: ""
+      endTime: "",
+      ranges: []
     };
   }
 
   if(entry && typeof entry === "object"){
+    const ranges = Array.isArray(entry.ranges)
+      ? entry.ranges
+          .map((range)=>({
+            startTime: String(range.startTime || "").trim(),
+            endTime: String(range.endTime || "").trim()
+          }))
+          .filter((range)=>range.startTime && range.endTime)
+      : [];
+
+    const legacyStart = String(entry.startTime || "").trim();
+    const legacyEnd = String(entry.endTime || "").trim();
+    if(ranges.length === 0 && legacyStart && legacyEnd){
+      ranges.push({
+        startTime: legacyStart,
+        endTime: legacyEnd
+      });
+    }
+
     return {
       hours: parseFloat(entry.hours) || 0,
       mode: entry.mode === "range" ? "range" : "total",
-      startTime: entry.startTime || "",
-      endTime: entry.endTime || ""
+      startTime: ranges[0]?.startTime || "",
+      endTime: ranges[0]?.endTime || "",
+      ranges
     };
   }
 
@@ -698,7 +764,8 @@ function parseEntry(entry){
     hours: 0,
     mode: "range",
     startTime: "",
-    endTime: ""
+    endTime: "",
+    ranges: []
   };
 }
 
@@ -719,6 +786,71 @@ function calculateHoursFromRange(start, end){
 
   const diffHours = (endTotal - startTotal) / 60;
   return Math.round(diffHours * 10) / 10;
+}
+
+function renderTimeRangeRow(startTime = "", endTime = ""){
+  const wrapper = document.createElement("div");
+  wrapper.className = "time-range-row";
+  wrapper.innerHTML = `
+    <input type="time" class="start-time-input" value="${startTime}">
+    <input type="time" class="end-time-input" value="${endTime}">
+    <button class="remove-range-btn" type="button">Remove</button>
+  `;
+
+  const removeBtn = wrapper.querySelector(".remove-range-btn");
+  removeBtn.onclick = ()=>{
+    const list = document.getElementById("timeRangesList");
+    if(list.children.length <= 1){
+      wrapper.querySelector(".start-time-input").value = "";
+      wrapper.querySelector(".end-time-input").value = "";
+      return;
+    }
+
+    wrapper.remove();
+  };
+
+  return wrapper;
+}
+
+function addTimeRangeRow(startTime = "", endTime = ""){
+  const list = document.getElementById("timeRangesList");
+  list.appendChild(renderTimeRangeRow(startTime, endTime));
+}
+
+function resetTimeRangeRows(ranges = []){
+  const list = document.getElementById("timeRangesList");
+  list.innerHTML = "";
+
+  if(ranges.length === 0){
+    addTimeRangeRow();
+    return;
+  }
+
+  ranges.forEach((range)=>{
+    addTimeRangeRow(range.startTime, range.endTime);
+  });
+}
+
+function getFilledTimeRanges(){
+  const rows = Array.from(document.querySelectorAll("#timeRangesList .time-range-row"));
+  const ranges = [];
+
+  for(const row of rows){
+    const startTime = row.querySelector(".start-time-input").value;
+    const endTime = row.querySelector(".end-time-input").value;
+
+    if(!startTime && !endTime){
+      continue;
+    }
+
+    if(!startTime || !endTime){
+      return { ranges: [], invalid: true };
+    }
+
+    ranges.push({ startTime, endTime });
+  }
+
+  return { ranges, invalid: false };
 }
 
 function setEntryMode(mode){
@@ -752,29 +884,48 @@ function ensureActiveWorkplace(){
   return true;
 }
 
-function openWorkplaceModal(){
+function openWorkplaceModal(mode = "create"){
+  workplaceModalMode = mode;
+  const titleEl = document.getElementById("workplaceModalTitle");
+  const buttonEl = document.getElementById("workplaceSaveBtn");
+
+  if(mode === "edit" && ensureActiveWorkplace()){
+    const workplace = workplaces[activeWorkplace];
+    titleEl.innerText = "Edit workplace";
+    buttonEl.innerText = "Save";
+    document.getElementById("placeName").value = workplace.name;
+    document.getElementById("hourlyRate").value = workplace.rate;
+  }else{
+    workplaceModalMode = "create";
+    titleEl.innerText = "Add workplace";
+    buttonEl.innerText = "Create";
+    document.getElementById("placeName").value = "";
+    document.getElementById("hourlyRate").value = "";
+  }
+
   document.getElementById("workplaceModal").style.display = "flex";
 }
 
-function createWorkplace(){
-
+function saveWorkplace(){
   const name = document.getElementById("placeName").value.trim();
   const rate = parseFloat(document.getElementById("hourlyRate").value);
 
   if(!name || !rate) return;
 
-  workplaces.push({
-    name,
-    rate,
-    entries:{}
-  });
+  if(workplaceModalMode === "edit" && ensureActiveWorkplace()){
+    workplaces[activeWorkplace].name = name;
+    workplaces[activeWorkplace].rate = rate;
+  }else{
+    workplaces.push({
+      name,
+      rate,
+      entries:{}
+    });
 
-  activeWorkplace = workplaces.length - 1;
+    activeWorkplace = workplaces.length - 1;
+  }
 
   saveData();
-
-  document.getElementById("placeName").value = "";
-  document.getElementById("hourlyRate").value = "";
 
   document.getElementById("workplaceModal").style.display = "none";
 
@@ -809,7 +960,7 @@ function renderTabs(){
   add.className = "bubble add-bubble";
   add.innerText = "+";
 
-  add.onclick = openWorkplaceModal;
+  add.onclick = ()=>openWorkplaceModal("create");
 
   container.appendChild(add);
 }
@@ -927,11 +1078,16 @@ async function importCurrentMonthFromFile(event){
       const toValue = String(row[3] || "").trim();
       let hoursValue = parseHoursValue(row[1] || 0);
 
-      const hasRange =
-        fromValue && toValue && fromValue !== "-" && toValue !== "-";
+      const starts = fromValue && fromValue !== "-" ? fromValue.split(",").map((part)=>part.trim()).filter(Boolean) : [];
+      const ends = toValue && toValue !== "-" ? toValue.split(",").map((part)=>part.trim()).filter(Boolean) : [];
+      const hasRange = starts.length > 0 && starts.length === ends.length;
+      const ranges = hasRange
+        ? starts.map((startTime, index)=>({ startTime, endTime: ends[index] }))
+        : [];
 
-      if(hoursValue <= 0 && hasRange){
-        hoursValue = calculateHoursFromRange(fromValue, toValue);
+      if(hoursValue <= 0 && ranges.length > 0){
+        hoursValue = ranges.reduce((sum, range)=>sum + calculateHoursFromRange(range.startTime, range.endTime), 0);
+        hoursValue = Math.round(hoursValue * 10) / 10;
       }
 
       if(hoursValue <= 0){
@@ -940,19 +1096,21 @@ async function importCurrentMonthFromFile(event){
 
       const key = `${parsedDate.year}-${parsedDate.month}-${parsedDate.day}`;
 
-      if(hasRange){
+      if(ranges.length > 0){
         workplace.entries[key] = {
           mode: "range",
           hours: hoursValue,
-          startTime: fromValue,
-          endTime: toValue
+          startTime: ranges[0].startTime,
+          endTime: ranges[0].endTime,
+          ranges
         };
       }else{
         workplace.entries[key] = {
           mode: "total",
           hours: hoursValue,
           startTime: "",
-          endTime: ""
+          endTime: "",
+          ranges: []
         };
       }
 
@@ -1068,8 +1226,12 @@ function exportCurrentMonth(){
     const dayLabel = String(day).padStart(2,"0");
     const monthLabel = String(currentMonth + 1).padStart(2,"0");
     const dateLabel = `${dayLabel}/${monthLabel}/${currentYear}`;
-    const fromTime = entryData.startTime || "-";
-    const toTime = entryData.endTime || "-";
+    const fromTime = entryData.ranges.length > 0
+      ? entryData.ranges.map((range)=>range.startTime).join(", ")
+      : "-";
+    const toTime = entryData.ranges.length > 0
+      ? entryData.ranges.map((range)=>range.endTime).join(", ")
+      : "-";
 
     rows.push({
       date: dateLabel,
@@ -1187,7 +1349,12 @@ function renderCalendar(){
     const entryData = parseEntry(workplace.entries[key]);
     const workedHours = entryData.hours;
     const hasRangeInfo =
-      entryData.mode === "range" && entryData.startTime && entryData.endTime;
+      entryData.mode === "range" && entryData.ranges.length > 0;
+    const rangeDisplay = hasRangeInfo
+      ? entryData.ranges.length === 1
+        ? `${entryData.ranges[0].startTime} - ${entryData.ranges[0].endTime}`
+        : `${entryData.ranges[0].startTime} - ${entryData.ranges[0].endTime} +${entryData.ranges.length - 1}`
+      : "";
 
     if(workedHours > 0){
       totalHours += workedHours;
@@ -1203,7 +1370,7 @@ function renderCalendar(){
 
     div.innerHTML = `
       <div class="day-number">${day}</div>
-      ${hasRangeInfo ? `<div class="shift-range">${entryData.startTime} - ${entryData.endTime}</div>` : ""}
+      ${hasRangeInfo ? `<div class="shift-range">${rangeDisplay}</div>` : ""}
       <div class="hours">${workedHours ? formatHours(workedHours) + "h" : ""}</div>
     `;
 
@@ -1218,11 +1385,7 @@ function renderCalendar(){
       document.getElementById("hoursInput").value =
         selectedEntry.hours || "";
 
-      document.getElementById("startTimeInput").value =
-        selectedEntry.startTime || "";
-
-      document.getElementById("endTimeInput").value =
-        selectedEntry.endTime || "";
+      resetTimeRangeRows(selectedEntry.ranges);
 
       setEntryMode(selectedEntry.mode);
       const hasExistingEntry = Object.prototype.hasOwnProperty.call(workplace.entries, key);
@@ -1257,24 +1420,29 @@ function saveHours(){
       mode: "total",
       hours: value,
       startTime: "",
-      endTime: ""
+      endTime: "",
+      ranges: []
     };
   }else{
-    const startTime = document.getElementById("startTimeInput").value;
-    const endTime = document.getElementById("endTimeInput").value;
-
-    if(!startTime || !endTime){
-      alert("Please enter both start and end time.");
+    const { ranges, invalid } = getFilledTimeRanges();
+    if(invalid){
+      alert("Please complete both start and end time for each row.");
       return;
     }
 
-    const calculatedHours = calculateHoursFromRange(startTime, endTime);
+    if(ranges.length === 0){
+      alert("Please add at least one work time.");
+      return;
+    }
+
+    const calculatedHours = ranges.reduce((sum, range)=>sum + calculateHoursFromRange(range.startTime, range.endTime), 0);
 
     entry = {
       mode: "range",
-      hours: calculatedHours,
-      startTime,
-      endTime
+      hours: Math.round(calculatedHours * 10) / 10,
+      startTime: ranges[0].startTime,
+      endTime: ranges[0].endTime,
+      ranges
     };
   }
 
