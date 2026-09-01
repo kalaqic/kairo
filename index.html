@@ -253,6 +253,17 @@
       letter-spacing:.2px;
     }
 
+    .day-note{
+      position:absolute;
+      top:10px;
+      right:10px;
+      width:7px;
+      height:7px;
+      border-radius:50%;
+      background:#ffffff;
+      opacity:.75;
+    }
+
     .summary{
       margin-top:35px;
       display:grid;
@@ -1114,6 +1125,7 @@ async function importCurrentMonthFromFile(event){
       }
 
       const key = `${parsedDate.year}-${parsedDate.month}-${parsedDate.day}`;
+      const existingEntry = parseEntry(workplace.entries[key]);
 
       if(ranges.length > 0){
         workplace.entries[key] = {
@@ -1122,7 +1134,7 @@ async function importCurrentMonthFromFile(event){
           startTime: ranges[0].startTime,
           endTime: ranges[0].endTime,
           ranges,
-          description: ""
+          description: existingEntry.description
         };
       }else{
         workplace.entries[key] = {
@@ -1131,7 +1143,7 @@ async function importCurrentMonthFromFile(event){
           startTime: "",
           endTime: "",
           ranges: [],
-          description: ""
+          description: existingEntry.description
         };
       }
 
@@ -1369,6 +1381,7 @@ function renderCalendar(){
     const key = `${currentYear}-${currentMonth+1}-${day}`;
     const entryData = parseEntry(workplace.entries[key]);
     const workedHours = entryData.hours;
+    const hasDescription = Boolean(entryData.description);
     const hasRangeInfo =
       entryData.mode === "range" && entryData.ranges.length > 0;
     const rangeDisplay = hasRangeInfo
@@ -1391,6 +1404,7 @@ function renderCalendar(){
 
     div.innerHTML = `
       <div class="day-number">${day}</div>
+      ${hasDescription ? `<div class="day-note" title="Has description"></div>` : ""}
       ${hasRangeInfo ? `<div class="shift-range">${rangeDisplay}</div>` : ""}
       <div class="hours">${workedHours ? formatHours(workedHours) + "h" : ""}</div>
     `;
@@ -1435,6 +1449,7 @@ function saveHours(){
   const workplace = workplaces[activeWorkplace];
   let entry = null;
   const description = document.getElementById("dayDescriptionInput").value.trim();
+  const existingEntry = parseEntry(workplace.entries[selectedDateKey]);
 
   if(selectedEntryMode === "total"){
     const value = parseFloat(document.getElementById("hoursInput").value) || 0;
@@ -1454,24 +1469,37 @@ function saveHours(){
       return;
     }
 
-    if(ranges.length === 0){
-      alert("Please add at least one work time.");
+    if(ranges.length > 0){
+      const calculatedHours = ranges.reduce((sum, range)=>sum + calculateHoursFromRange(range.startTime, range.endTime), 0);
+
+      entry = {
+        mode: "range",
+        hours: Math.round(calculatedHours * 10) / 10,
+        startTime: ranges[0].startTime,
+        endTime: ranges[0].endTime,
+        ranges,
+        description
+      };
+    }else if(description || existingEntry.hours > 0 || existingEntry.ranges.length > 0){
+      entry = {
+        mode: existingEntry.ranges.length > 0 ? "range" : existingEntry.mode,
+        hours: existingEntry.hours,
+        startTime: existingEntry.startTime,
+        endTime: existingEntry.endTime,
+        ranges: existingEntry.ranges,
+        description
+      };
+    }else{
+      alert("Please add work time or a description.");
       return;
     }
-
-    const calculatedHours = ranges.reduce((sum, range)=>sum + calculateHoursFromRange(range.startTime, range.endTime), 0);
-
-    entry = {
-      mode: "range",
-      hours: Math.round(calculatedHours * 10) / 10,
-      startTime: ranges[0].startTime,
-      endTime: ranges[0].endTime,
-      ranges,
-      description
-    };
   }
 
-  workplace.entries[selectedDateKey] = entry;
+  if(entry.hours <= 0 && !entry.description){
+    delete workplace.entries[selectedDateKey];
+  }else{
+    workplace.entries[selectedDateKey] = entry;
+  }
 
   saveData();
 
