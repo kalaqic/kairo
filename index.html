@@ -1091,6 +1091,11 @@ async function importCurrentMonthFromFile(event){
       return;
     }
 
+    const headerCells = matrixRows[headerRowIndex].map((cell)=>String(cell).trim().toLowerCase());
+    const descriptionColumnIndex = headerCells.findIndex((cell)=>
+      cell === "opis" || cell === "description" || cell === "desc"
+    );
+
     const workplace = workplaces[activeWorkplace];
     let importedCount = 0;
     let firstImportedMonth = null;
@@ -1107,6 +1112,9 @@ async function importCurrentMonthFromFile(event){
       const fromValue = String(row[2] || "").trim();
       const toValue = String(row[3] || "").trim();
       let hoursValue = parseHoursValue(row[1] || 0);
+      const importedDescription = descriptionColumnIndex >= 0
+        ? String(row[descriptionColumnIndex] || "").trim()
+        : "";
 
       const starts = fromValue && fromValue !== "-" ? fromValue.split(",").map((part)=>part.trim()).filter(Boolean) : [];
       const ends = toValue && toValue !== "-" ? toValue.split(",").map((part)=>part.trim()).filter(Boolean) : [];
@@ -1120,12 +1128,13 @@ async function importCurrentMonthFromFile(event){
         hoursValue = Math.round(hoursValue * 10) / 10;
       }
 
-      if(hoursValue <= 0){
+      if(hoursValue <= 0 && !importedDescription){
         return;
       }
 
       const key = `${parsedDate.year}-${parsedDate.month}-${parsedDate.day}`;
       const existingEntry = parseEntry(workplace.entries[key]);
+      const description = importedDescription || existingEntry.description;
 
       if(ranges.length > 0){
         workplace.entries[key] = {
@@ -1134,16 +1143,16 @@ async function importCurrentMonthFromFile(event){
           startTime: ranges[0].startTime,
           endTime: ranges[0].endTime,
           ranges,
-          description: existingEntry.description
+          description
         };
       }else{
         workplace.entries[key] = {
-          mode: "total",
+          mode: hoursValue > 0 ? "total" : existingEntry.mode || "total",
           hours: hoursValue,
           startTime: "",
           endTime: "",
           ranges: [],
-          description: existingEntry.description
+          description
         };
       }
 
@@ -1250,11 +1259,13 @@ function exportCurrentMonth(){
     const key = `${currentYear}-${currentMonth+1}-${day}`;
     const entryData = parseEntry(workplace.entries[key]);
 
-    if(entryData.hours <= 0){
+    if(entryData.hours <= 0 && !entryData.description){
       continue;
     }
 
-    totalHours += entryData.hours;
+    if(entryData.hours > 0){
+      totalHours += entryData.hours;
+    }
 
     const dayLabel = String(day).padStart(2,"0");
     const monthLabel = String(currentMonth + 1).padStart(2,"0");
@@ -1268,9 +1279,10 @@ function exportCurrentMonth(){
 
     rows.push({
       date: dateLabel,
-      hours: formatHours(entryData.hours),
+      hours: entryData.hours > 0 ? formatHours(entryData.hours) : "",
       from: fromTime,
-      to: toTime
+      to: toTime,
+      description: entryData.description || ""
     });
   }
 
@@ -1286,26 +1298,28 @@ function exportCurrentMonth(){
     Datum: row.date,
     Ure: row.hours,
     Od: row.from,
-    Do: row.to
+    Do: row.to,
+    Opis: row.description
   }));
 
   worksheetRows.push({
     Datum: "Skupaj ur v mesecu",
     Ure: formatHours(totalHours),
     Od: "",
-    Do: ""
+    Do: "",
+    Opis: ""
   });
 
   const workbook = XLSX.utils.book_new();
   const worksheetData = [
-    ["Kairo", "", "", ""],
-    ["Datum","Ure","Od","Do"],
-    ...worksheetRows.map((row)=>[row.Datum, row.Ure, row.Od, row.Do])
+    ["Kairo", "", "", "", ""],
+    ["Datum","Ure","Od","Do","Opis"],
+    ...worksheetRows.map((row)=>[row.Datum, row.Ure, row.Od, row.Do, row.Opis])
   ];
   const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
 
   worksheet["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }
   ];
 
   if(worksheet.A1){
@@ -1321,7 +1335,8 @@ function exportCurrentMonth(){
     { wch: 16 },
     { wch: 10 },
     { wch: 10 },
-    { wch: 10 }
+    { wch: 10 },
+    { wch: 40 }
   ];
 
   XLSX.utils.book_append_sheet(workbook, worksheet, "Evidenca dela");
